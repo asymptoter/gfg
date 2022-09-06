@@ -10,27 +10,36 @@ import (
 	"time"
 )
 
+const (
+	keyGoModPath      = "GO_MOD_PATH"
+	keyBaseBranchName = "BASE_BRANCH_NAME"
+	keyGoModuleName   = "GO_MODULE_NAME"
+)
+
 var (
-	goModuleName    = os.Getenv("GO_MODULE_NAME")
-	goModPath       = os.Getenv("GO_MOD_PATH")
-	basicBranchName = os.Getenv("BASIC_BRANCH_NAME")
+	goModuleName   = os.Getenv(keyGoModuleName)
+	goModPath      = os.Getenv(keyGoModPath)
+	baseBranchName = os.Getenv(keyBaseBranchName)
 )
 
 /*
-	package dependencys:
-		A imports B
-		A imports C
-		A imports D
-		B imports C
+package dependencys:
 
-	BottomUp: if key package changed, value packages must be tested.
-		B: [A]
-		C: [A, B]
-		D: [A]
+	A imports B
+	A imports C
+	A imports D
+	B imports C
 
-	TopDown: if key package changed, value packages in BottomUp must be updated.
-		A: [B, C, D]
-		B: [C]
+BottomUp: if key package changed, value packages must be tested.
+
+	B: [A]
+	C: [A, B]
+	D: [A]
+
+TopDown: if key package changed, value packages in BottomUp must be updated.
+
+	A: [B, C, D]
+	B: [C]
 */
 type dependency struct {
 	BottomUp map[string]map[string]struct{}
@@ -40,6 +49,10 @@ type dependency struct {
 func main() {
 	t1 := time.Now()
 
+	goModuleName = os.Getenv(keyGoModuleName)
+	goModPath = os.Getenv(keyGoModPath)
+	baseBranchName = os.Getenv(keyBaseBranchName)
+
 	if len(goModuleName) == 0 {
 		panic("ENV GO_MODULE_NAME not set")
 	}
@@ -48,8 +61,8 @@ func main() {
 		panic("ENV GO_MOD_PATH not set")
 	}
 
-	if len(basicBranchName) == 0 {
-		panic("ENV BASIC_BRANCH_NAME not set")
+	if len(baseBranchName) == 0 {
+		panic("ENV BASE_BRANCH_NAME not set")
 	}
 
 	dependency := getDependency()
@@ -59,12 +72,13 @@ func main() {
 	bs, _ := json.MarshalIndent(dependency, "", "    ")
 	fmt.Println(string(bs))
 
-	runTests(toBeTestedPackages)
+	fmt.Println(toBeTestedPackages)
+	runGoTests(toBeTestedPackages)
 
 	fmt.Printf("time elapsed: %fs\n", time.Now().Sub(t1).Seconds())
 }
 
-func runTests(pkgs []string) {
+func runGoTests(pkgs []string) {
 	for _, pkg := range pkgs {
 		fmt.Printf("go test %s: ", pkg)
 		cmd := exec.Command("go", "test", pkg)
@@ -126,6 +140,8 @@ func constructDependency() dependency {
 		res.TopDown[pkg] = map[string]struct{}{}
 	}
 
+	pretty(res)
+
 	for _, pkg := range packages {
 		updateDependency(&res, pkg)
 	}
@@ -155,7 +171,7 @@ func getImportedPackages(pkg string) []string {
 }
 
 func getToBeTestedPackages(dp dependency) []string {
-	cmd := exec.Command("git", "diff", "--name-only", "--relative", basicBranchName)
+	cmd := exec.Command("git", "diff", "--name-only", "--relative", baseBranchName)
 	cmd.Dir = goModPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -196,4 +212,9 @@ func trimFileName(path string) string {
 		}
 	}
 	return ""
+}
+
+func pretty(v any) {
+	bs, _ := json.MarshalIndent(v, "", "    ")
+	fmt.Println(string(bs))
 }
