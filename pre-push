@@ -1,0 +1,3 @@
+#!/bin/sh
+
+go run ${GIT_REPOSTORY_ROOT}/.git/hooks/main.go

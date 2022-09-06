@@ -77,11 +77,11 @@ func main() {
 func runGoTests(pkgs []string) {
 	for _, pkg := range pkgs {
 		fmt.Printf("go test %s: ", pkg)
-		cmd := exec.Command("go", "test", pkg)
+		cmd := exec.Command("go", "test", "--short", pkg)
 		cmd.Dir = goModPath
 		if err := cmd.Run(); err != nil {
 			fmt.Println("failed")
-			panic(err)
+			os.Exit(1)
 		}
 		fmt.Println("ok")
 	}
@@ -117,7 +117,8 @@ func getDependency() dependency {
 }
 
 func constructDependency() dependency {
-	cmd := exec.Command("go", "list", "./...")
+	rcmd := "go list -buildvcs=false ./..."
+	cmd := exec.Command("bash", "-c", rcmd)
 	cmd.Dir = goModPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -136,8 +137,6 @@ func constructDependency() dependency {
 		res.TopDown[pkg] = map[string]struct{}{}
 	}
 
-	pretty(res)
-
 	for _, pkg := range packages {
 		updateDependency(&res, pkg)
 	}
@@ -155,7 +154,7 @@ func updateDependency(dp *dependency, pkg string) {
 }
 
 func getImportedPackages(pkg string) []string {
-	rcmd := `go list -f '{{range $imp := .Imports}}{{printf "%s\n" $imp}}{{end}}' ` + pkg
+	rcmd := `go list -buildvcs=false -f '{{range $imp := .Imports}}{{printf "%s\n" $imp}}{{end}}' ` + pkg
 	cmd := exec.Command("bash", "-c", rcmd)
 	cmd.Dir = goModPath
 	output, err := cmd.Output()
@@ -167,7 +166,8 @@ func getImportedPackages(pkg string) []string {
 }
 
 func getToBeTestedPackages(dp dependency) []string {
-	cmd := exec.Command("git", "diff", "--name-only", "--relative", baseBranchName)
+	rcmd := "git --no-pager diff --name-only --relative " + baseBranchName
+	cmd := exec.Command("sh", "-c", rcmd)
 	cmd.Dir = goModPath
 	output, err := cmd.Output()
 	if err != nil {
@@ -181,8 +181,14 @@ func getToBeTestedPackages(dp dependency) []string {
 	for i := range modifiedFiles {
 		modifiedFiles[i] = trimFileName(modifiedFiles[i])
 		pkg := goModuleName + "/" + modifiedFiles[i]
-		res = append(res, pkg)
-		m[pkg] = struct{}{}
+
+		if _, ok := m[pkg]; !ok {
+			m[pkg] = struct{}{}
+
+			if !strings.Contains(pkg, "mocks") {
+				res = append(res, pkg)
+			}
+		}
 	}
 
 	for _, d := range res {
@@ -193,7 +199,9 @@ func getToBeTestedPackages(dp dependency) []string {
 		for pkg := range dp.BottomUp[d] {
 			if _, ok := m[pkg]; !ok {
 				m[pkg] = struct{}{}
-				res = append(res, pkg)
+				if !strings.Contains(pkg, "mocks") {
+					res = append(res, pkg)
+				}
 			}
 		}
 	}
@@ -210,7 +218,7 @@ func trimFileName(path string) string {
 	return ""
 }
 
-func pretty(v any) {
+func pretty(v interface{}) {
 	bs, _ := json.MarshalIndent(v, "", "    ")
 	fmt.Println(string(bs))
 }
