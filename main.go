@@ -69,10 +69,6 @@ func main() {
 
 	toBeTestedPackages := getToBeTestedPackages(dependency)
 
-	bs, _ := json.MarshalIndent(dependency, "", "    ")
-	fmt.Println(string(bs))
-
-	fmt.Println(toBeTestedPackages)
 	runGoTests(toBeTestedPackages)
 
 	fmt.Printf("time elapsed: %fs\n", time.Now().Sub(t1).Seconds())
