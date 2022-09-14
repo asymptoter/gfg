@@ -247,9 +247,17 @@ func parseFileName(path string) (gitFileStatus, string) {
 	ss := strings.Split(path, " ")
 	res := ""
 	status := gitFileStatus(ss[0][0])
-	for i := len(ss[1]) - 1; i >= 0; i-- {
-		if ss[1][i] == '/' {
-			res = strings.TrimSpace(ss[1][:i])
+
+	for i := 1; i < len(ss); i++ {
+		if len(ss[i]) > 0 {
+			path = ss[i]
+			break
+		}
+	}
+
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' {
+			res = strings.TrimSpace(path[:i])
 			break
 		}
 	}
