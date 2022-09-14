@@ -112,6 +112,7 @@ func TestGetToBeTestedPackages(t *testing.T) {
 			"M  a/1.go",
 			"A  e/2.go",
 			"D  b/3.go",
+			"R073 c/4.go",
 		}
 	}
 
@@ -120,6 +121,7 @@ func TestGetToBeTestedPackages(t *testing.T) {
 		"gfg/a",
 		"gfg/e",
 		"gfg/b",
+		"gfg/c",
 	}
 	if !reflect.DeepEqual(res, exp) {
 		log.Fatal("\r\nexpected: ", exp, "\r\nactual: ", res, "\r\n")

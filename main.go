@@ -154,7 +154,7 @@ func updateDependency(dp *dependency, status gitFileStatus, goModuleName, pkg st
 				dp.TopDown[pkg][importedPackage] = struct{}{}
 			}
 		}
-	case statusModified, statusDeleted:
+	case statusModified, statusDeleted, statusRenamed:
 		dp.TopDown[pkg] = map[string]struct{}{}
 		for _, importedPackage := range getImportedPackages(pkg) {
 			if strings.HasPrefix(importedPackage, goModuleName) {
