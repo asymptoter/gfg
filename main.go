@@ -239,7 +239,7 @@ type gitFileStatus string
 const (
 	statusModified gitFileStatus = "M"
 	statusNew      gitFileStatus = "A"
-	statusDeleted  gitFileStatus = "D"
+	statusDeleted  gitFileStatus = "R"
 )
 
 func parseFileName(path string) (gitFileStatus, string) {

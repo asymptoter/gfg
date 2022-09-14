@@ -24,7 +24,7 @@ export BASE_BRANCH_NAME=<git_base_branch_name>
 2. Download the `main.go`
 
 ```bash
-$ curl https://github.com/asymptoter/gfg/blob/master/main.go
+$ curl https://raw.githubusercontent.com/asymptoter/gfg/master/main.go 
 > ${GIT_REPOSITORY_ROOT}/.git/hooks/main.go
 
 $ cd ${GIT_REPOSITORY_ROOT}/.git/hooks
