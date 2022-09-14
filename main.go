@@ -13,11 +13,9 @@ import (
 const (
 	keyGoModPath      = "GO_MOD_PATH"
 	keyBaseBranchName = "BASE_BRANCH_NAME"
-	keyGoModuleName   = "GO_MODULE_NAME"
 )
 
 var (
-	goModuleName   = os.Getenv(keyGoModuleName)
 	goModPath      = os.Getenv(keyGoModPath)
 	baseBranchName = os.Getenv(keyBaseBranchName)
 )
@@ -49,13 +47,9 @@ type dependency struct {
 func main() {
 	t1 := time.Now()
 
-	goModuleName = os.Getenv(keyGoModuleName)
+	goModuleName := getGoModuleName()
 	goModPath = os.Getenv(keyGoModPath)
 	baseBranchName = os.Getenv(keyBaseBranchName)
-
-	if len(goModuleName) == 0 {
-		panic("ENV GO_MODULE_NAME not set")
-	}
 
 	if len(goModPath) == 0 {
 		panic("ENV GO_MOD_PATH not set")
@@ -65,9 +59,13 @@ func main() {
 		panic("ENV BASE_BRANCH_NAME not set")
 	}
 
-	dependency := getDependency()
+	dependency := getDependency(goModuleName)
 
-	toBeTestedPackages := getToBeTestedPackages(dependency)
+	pretty(dependency)
+
+	toBeTestedPackages := getToBeTestedPackages(&dependency, goModuleName, baseBranchName)
+
+	pretty(toBeTestedPackages)
 
 	runGoTests(toBeTestedPackages)
 
@@ -87,7 +85,7 @@ func runGoTests(pkgs []string) {
 	}
 }
 
-func getDependency() dependency {
+func getDependency(goModuleName string) dependency {
 	file, err := os.OpenFile(goModPath+"/.go_module_dependency_map", os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		panic(err)
@@ -101,7 +99,7 @@ func getDependency() dependency {
 
 	var res dependency
 	if err := json.Unmarshal(bs, &res); err != nil || len(res.BottomUp) == 0 {
-		res = constructDependency()
+		res = constructDependency(goModuleName)
 
 		// Store dependency map in file
 		mBytes, err := json.Marshal(res)
@@ -116,17 +114,8 @@ func getDependency() dependency {
 	return res
 }
 
-func constructDependency() dependency {
-	rcmd := "go list -buildvcs=false ./..."
-	cmd := exec.Command("bash", "-c", rcmd)
-	cmd.Dir = goModPath
-	output, err := cmd.Output()
-	if err != nil {
-		panic(err)
-	}
-
-	packages := strings.Split(string(output), "\n")
-	packages = packages[0 : len(packages)-1] // Remove empty
+func constructDependency(goModuleName string) dependency {
+	packages := listPackages()
 
 	res := dependency{
 		BottomUp: make(map[string]map[string]struct{}, len(packages)),
@@ -138,64 +127,100 @@ func constructDependency() dependency {
 	}
 
 	for _, pkg := range packages {
-		updateDependency(&res, pkg)
+		updateDependency(&res, statusNew, goModuleName, pkg)
 	}
 
 	return res
 }
 
-func updateDependency(dp *dependency, pkg string) {
-	for _, importedPackage := range getImportedPackages(pkg) {
-		if strings.HasPrefix(importedPackage, goModuleName) {
-			dp.BottomUp[importedPackage][pkg] = struct{}{}
-			dp.TopDown[pkg][importedPackage] = struct{}{}
+func updateDependency(dp *dependency, status gitFileStatus, goModuleName, pkg string) {
+	switch status {
+	case statusNew:
+		for _, importedPackage := range getImportedPackages(pkg) {
+			if strings.HasPrefix(importedPackage, goModuleName) {
+				if dp.BottomUp == nil {
+					dp.BottomUp = map[string]map[string]struct{}{}
+				}
+				if dp.BottomUp[importedPackage] == nil {
+					dp.BottomUp[importedPackage] = map[string]struct{}{}
+				}
+				if dp.TopDown == nil {
+					dp.TopDown = map[string]map[string]struct{}{}
+				}
+				if dp.TopDown[pkg] == nil {
+					dp.TopDown[pkg] = map[string]struct{}{}
+				}
+				dp.BottomUp[importedPackage][pkg] = struct{}{}
+				dp.TopDown[pkg][importedPackage] = struct{}{}
+			}
 		}
+	case statusModified, statusDeleted:
+		dp.TopDown[pkg] = map[string]struct{}{}
+		for _, importedPackage := range getImportedPackages(pkg) {
+			if strings.HasPrefix(importedPackage, goModuleName) {
+				dp.TopDown[pkg][importedPackage] = struct{}{}
+			}
+		}
+	default:
+		panic(fmt.Sprintln("invalid status: ", status))
 	}
 }
 
-func getImportedPackages(pkg string) []string {
+var listPackages func() []string = func() []string {
+	rcmd := "go list -buildvcs=false ./..."
+	return execCommand(rcmd)
+}
+
+var getImportedPackages func(pkg string) []string = func(pkg string) []string {
 	rcmd := `go list -buildvcs=false -f '{{range $imp := .Imports}}{{printf "%s\n" $imp}}{{end}}' ` + pkg
-	cmd := exec.Command("bash", "-c", rcmd)
-	cmd.Dir = goModPath
-	output, err := cmd.Output()
-	if err != nil {
-		panic(err)
-	}
-	res := strings.Split(string(output), "\n")
-	return res[0 : len(res)-1] // Remove empty
+	return execCommand(rcmd)
 }
 
-func getToBeTestedPackages(dp dependency) []string {
-	rcmd := "git --no-pager diff --name-only --relative " + baseBranchName
+var getModifiedFiles func(baseBranchName string) []string = func(baseBranchName string) []string {
+	rcmd := "git --no-pager diff --name-status --relative " + baseBranchName
+	return execCommand(rcmd)
+}
+
+func getGoModuleName() string {
+	rcmd := "head -1 go.mod"
+
+	// module github.com/asymptoter/gfg
+	firstLine := execCommand(rcmd)[0]
+	return strings.Split(firstLine, " ")[1]
+}
+
+func execCommand(rcmd string) []string {
 	cmd := exec.Command("sh", "-c", rcmd)
 	cmd.Dir = goModPath
 	output, err := cmd.Output()
 	if err != nil {
-		panic(err)
+		return []string{}
 	}
-	modifiedFiles := strings.Split(string(output), "\n")
-	modifiedFiles = modifiedFiles[:len(modifiedFiles)-1]
 
+	res := strings.Split(string(output), "\n")
+	return res[:len(res)-1] // Remove empty
+}
+
+func getToBeTestedPackages(dp *dependency, goModuleName, baseBranchName string) []string {
 	res := []string{}
 	m := map[string]struct{}{}
-	for i := range modifiedFiles {
-		modifiedFiles[i] = trimFileName(modifiedFiles[i])
-		pkg := goModuleName + "/" + modifiedFiles[i]
+	for _, modifiedFile := range getModifiedFiles(baseBranchName) {
+		status, partialPackagePath := parseFileName(modifiedFile)
+		packagePath := goModuleName + "/" + partialPackagePath
 
-		if _, ok := m[pkg]; !ok {
-			m[pkg] = struct{}{}
+		if _, ok := m[packagePath]; !ok {
+			m[packagePath] = struct{}{}
 
-			if !strings.Contains(pkg, "mocks") {
-				res = append(res, pkg)
+			updateDependency(dp, status, goModuleName, packagePath)
+
+			if !strings.Contains(packagePath, "mocks") {
+				res = append(res, packagePath)
 			}
 		}
 	}
 
+	// Add packages that depend on modified files
 	for _, d := range res {
-		for pkg := range dp.TopDown[d] {
-			updateDependency(&dp, pkg)
-		}
-
 		for pkg := range dp.BottomUp[d] {
 			if _, ok := m[pkg]; !ok {
 				m[pkg] = struct{}{}
@@ -209,13 +234,21 @@ func getToBeTestedPackages(dp dependency) []string {
 	return res
 }
 
-func trimFileName(path string) string {
+type gitFileStatus string
+
+const (
+	statusModified gitFileStatus = "M"
+	statusNew      gitFileStatus = "A"
+	statusDeleted  gitFileStatus = "D"
+)
+
+func parseFileName(path string) (gitFileStatus, string) {
 	for i := len(path) - 1; i >= 0; i-- {
 		if path[i] == '/' {
-			return path[:i]
+			return gitFileStatus(path[0]), strings.TrimSpace(path[1:i])
 		}
 	}
-	return ""
+	return gitFileStatus(path[0]), ""
 }
 
 func pretty(v interface{}) {

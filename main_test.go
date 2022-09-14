@@ -1,21 +1,127 @@
 package main
 
 import (
-	"os/exec"
+	"log"
+	"reflect"
 	"testing"
 )
 
-func Test(t *testing.T) {
-	output, err := exec.Command("pwd").Output()
-	if err != nil {
-		t.Fatal(err)
+func TestConstructDependency(t *testing.T) {
+	listPackages = func() []string {
+		return []string{
+			"a",
+			"b",
+			"c",
+			"d",
+		}
 	}
-	workingDir := string(output)
-	workingDir = workingDir[:len(workingDir)-1]
 
-	t.Setenv(keyGoModPath, workingDir+"/a")
-	t.Setenv(keyBaseBranchName, "master")
-	t.Setenv(keyGoModuleName, "github.com/asymptoter/gfg")
+	importedPackageMap := map[string][]string{
+		"a": []string{
+			"b",
+			"c",
+		},
+		"b": []string{
+			"c",
+		},
+		"c": []string{},
+		"d": []string{},
+	}
 
-	main()
+	getImportedPackages = func(pkg string) []string {
+		return importedPackageMap[pkg]
+	}
+
+	res := constructDependency("")
+	exp := dependency{
+		BottomUp: map[string]map[string]struct{}{
+			"a": map[string]struct{}{},
+			"b": map[string]struct{}{
+				"a": {},
+			},
+			"c": map[string]struct{}{
+				"a": {},
+				"b": {},
+			},
+			"d": map[string]struct{}{},
+		},
+		TopDown: map[string]map[string]struct{}{
+			"a": map[string]struct{}{
+				"b": {},
+				"c": {},
+			},
+			"b": map[string]struct{}{
+				"c": {},
+			},
+			"c": map[string]struct{}{},
+			"d": map[string]struct{}{},
+		},
+	}
+	if !reflect.DeepEqual(res, exp) {
+		log.Fatal("expected", exp, "actual", res)
+	}
+}
+
+func TestGetToBeTestedPackages(t *testing.T) {
+	dep := dependency{
+		BottomUp: map[string]map[string]struct{}{
+			"gfg/a": map[string]struct{}{},
+			"gfg/b": map[string]struct{}{
+				"gfg/a": {},
+			},
+			"gfg/c": map[string]struct{}{
+				"gfg/a": {},
+				"gfg/b": {},
+			},
+			"gfg/d": map[string]struct{}{},
+		},
+		TopDown: map[string]map[string]struct{}{
+			"gfg/a": map[string]struct{}{
+				"gfg/b": {},
+				"gfg/c": {},
+			},
+			"gfg/b": map[string]struct{}{
+				"gfg/c": {},
+			},
+			"gfg/c": map[string]struct{}{},
+			"gfg/d": map[string]struct{}{},
+		},
+	}
+
+	importedPackageMap := map[string][]string{
+		"gfg/a": []string{
+			"gfg/b",
+			"gfg/c",
+		},
+		"gfg/b": []string{
+			"gfg/c",
+		},
+		"gfg/c": []string{},
+		"gfg/d": []string{},
+		"gfg/e": []string{
+			"gfg/c",
+		},
+	}
+
+	getImportedPackages = func(pkg string) []string {
+		return importedPackageMap[pkg]
+	}
+
+	getModifiedFiles = func(string) []string {
+		return []string{
+			"M a/1.go",
+			"A e/2.go",
+			"D b/3.go",
+		}
+	}
+
+	res := getToBeTestedPackages(&dep, "gfg", "")
+	exp := []string{
+		"gfg/a",
+		"gfg/e",
+		"gfg/b",
+	}
+	if !reflect.DeepEqual(res, exp) {
+		log.Fatal("\r\nexpected: ", exp, "\r\nactual: ", res, "\r\n")
+	}
 }
