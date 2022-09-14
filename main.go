@@ -239,16 +239,21 @@ type gitFileStatus string
 const (
 	statusModified gitFileStatus = "M"
 	statusNew      gitFileStatus = "A"
-	statusDeleted  gitFileStatus = "R"
+	statusDeleted  gitFileStatus = "D"
+	statusRenamed  gitFileStatus = "R"
 )
 
 func parseFileName(path string) (gitFileStatus, string) {
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' {
-			return gitFileStatus(path[0]), strings.TrimSpace(path[1:i])
+	ss := strings.Split(path, " ")
+	res := ""
+	status := gitFileStatus(ss[0][0])
+	for i := len(ss[1]) - 1; i >= 0; i-- {
+		if ss[1][i] == '/' {
+			res = strings.TrimSpace(ss[1][:i])
+			break
 		}
 	}
-	return gitFileStatus(path[0]), ""
+	return status, res
 }
 
 func pretty(v interface{}) {
