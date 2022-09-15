@@ -109,10 +109,10 @@ func TestGetToBeTestedPackages(t *testing.T) {
 
 	getModifiedFiles = func(string) []string {
 		return []string{
-			"M  a/1.go",
-			"A  e/2.go",
-			"D  b/3.go",
-			"R073 c/4.go",
+			"M		a/1.go",
+			"A		e/2.go",
+			"D		b/3.go",
+			"R073	c/4.go",
 		}
 	}
 

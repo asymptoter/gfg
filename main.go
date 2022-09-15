@@ -61,11 +61,7 @@ func main() {
 
 	dependency := getDependency(goModuleName)
 
-	pretty(dependency)
-
 	toBeTestedPackages := getToBeTestedPackages(&dependency, goModuleName, baseBranchName)
-
-	pretty(toBeTestedPackages)
 
 	runGoTests(toBeTestedPackages)
 
@@ -243,9 +239,14 @@ const (
 	statusRenamed  gitFileStatus = "R"
 )
 
+const (
+	// This is string(byte(9)), not white space.
+	tab = "	"
+)
+
 func parseFileName(path string) (gitFileStatus, string) {
-	ss := strings.Split(path, " ")
-	res := ""
+	ss := strings.Split(path, tab)
+
 	status := gitFileStatus(ss[0][0])
 
 	for i := 1; i < len(ss); i++ {
@@ -255,6 +256,7 @@ func parseFileName(path string) (gitFileStatus, string) {
 		}
 	}
 
+	res := ""
 	for i := len(path) - 1; i >= 0; i-- {
 		if path[i] == '/' {
 			res = strings.TrimSpace(path[:i])
