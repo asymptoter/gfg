@@ -18,6 +18,6 @@ if [[ ! -f "pre-push" ]]; then
 	chmod +x pre-push	
 fi
 
-echo "./git/hooks/gfg" >> pre-push
+echo ".git/hooks/gfg" >> pre-push
 
 popd
