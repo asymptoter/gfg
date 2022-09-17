@@ -1,10 +1,8 @@
 #!/bin/sh
 
-GIT_REPOSITORY_ROOT=$1
+curl https://raw.githubusercontent.com/asymptoter/gfg/master/main.go > .git/hooks/main.go
 
-curl https://raw.githubusercontent.com/asymptoter/gfg/master/main.go > "${GIT_REPOSITORY_ROOT}/.git/hooks/main.go"
-
-pushd ${GIT_REPOSITORY_ROOT}/.git/hooks
+pushd .git/hooks
 
 go mod init &> /dev/null
 go mod tidy
