@@ -1,8 +1,8 @@
 #!/bin/sh
 
-curl https://raw.githubusercontent.com/asymptoter/gfg/master/main.go > .git/hooks/main.go
+curl -s https://raw.githubusercontent.com/asymptoter/gfg/master/main.go > .git/hooks/main.go
 
-pushd .git/hooks
+pushd .git/hooks &>/dev/null
 
 go mod init &> /dev/null
 go mod tidy
@@ -16,6 +16,6 @@ if [[ ! -f "pre-push" ]]; then
 	chmod +x pre-push	
 fi
 
-echo ".git/hooks/gfg" >> pre-push
+grep -Fxq ".git/hooks/gfg" pre-push || echo ".git/hooks/gfg" >> pre-push
 
-popd
+popd &>/dev/null
