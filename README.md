@@ -17,7 +17,6 @@ go test ./...
 1. Setup ENV used by `main.go` and `pre-push`
  
 ```bash
-export GO_MOD_PATH=<absolute_path_of_go.mod>
 export BASE_BRANCH_NAME=<git_base_branch_name>
 ```
  

@@ -11,12 +11,10 @@ import (
 )
 
 const (
-	keyGoModPath      = "GO_MOD_PATH"
 	keyBaseBranchName = "BASE_BRANCH_NAME"
 )
 
 var (
-	goModPath      = os.Getenv(keyGoModPath)
 	baseBranchName = os.Getenv(keyBaseBranchName)
 )
 
@@ -44,35 +42,40 @@ type dependency struct {
 	TopDown  map[string]map[string]struct{}
 }
 
+type handler struct {
+	dp             dependency
+	baseBranchName string
+	goModuleName   string
+	goModDir       string
+}
+
 func main() {
 	t1 := time.Now()
 
-	goModuleName := getGoModuleName()
-	goModPath = os.Getenv(keyGoModPath)
-	baseBranchName = os.Getenv(keyBaseBranchName)
-
-	if len(goModPath) == 0 {
-		panic("ENV GO_MOD_PATH not set")
+	h := handler{
+		baseBranchName: os.Getenv(keyBaseBranchName),
 	}
 
-	if len(baseBranchName) == 0 {
+	if len(h.baseBranchName) == 0 {
 		panic("ENV BASE_BRANCH_NAME not set")
 	}
 
-	dependency := getDependency(goModuleName)
+	h.loadGoModDir()
+	h.loadGoModuleName()
+	h.loadDependency()
 
-	toBeTestedPackages := getToBeTestedPackages(&dependency, goModuleName, baseBranchName)
+	toBeTestedPackages := h.getToBeTestedPackages()
 
-	runGoTests(toBeTestedPackages)
+	h.runGoTests(toBeTestedPackages)
 
 	fmt.Printf("time elapsed: %fs\n", time.Now().Sub(t1).Seconds())
 }
 
-func runGoTests(pkgs []string) {
+func (h *handler) runGoTests(pkgs []string) {
 	for _, pkg := range pkgs {
 		fmt.Printf("go test %s: ", pkg)
 		cmd := exec.Command("go", "test", "--short", pkg)
-		cmd.Dir = goModPath
+		cmd.Dir = h.goModDir
 		if err := cmd.Run(); err != nil {
 			fmt.Println("failed")
 			os.Exit(1)
@@ -81,8 +84,8 @@ func runGoTests(pkgs []string) {
 	}
 }
 
-func getDependency(goModuleName string) dependency {
-	file, err := os.OpenFile(goModPath+"/.go_module_dependency_map", os.O_RDWR|os.O_CREATE, 0755)
+func (h *handler) loadDependency() {
+	file, err := os.OpenFile(h.goModDir+"/.go_module_dependency_map", os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -95,10 +98,10 @@ func getDependency(goModuleName string) dependency {
 
 	var res dependency
 	if err := json.Unmarshal(bs, &res); err != nil || len(res.BottomUp) == 0 {
-		res = constructDependency(goModuleName)
+		h.constructDependency()
 
 		// Store dependency map in file
-		mBytes, err := json.Marshal(res)
+		mBytes, err := json.Marshal(h.dp)
 		if err != nil {
 			panic(err)
 		}
@@ -106,55 +109,52 @@ func getDependency(goModuleName string) dependency {
 			panic(err)
 		}
 	}
-
-	return res
 }
 
-func constructDependency(goModuleName string) dependency {
-	packages := listPackages()
+func (h *handler) constructDependency() {
+	packages := listPackages(h.goModDir)
 
-	res := dependency{
+	h.dp = dependency{
 		BottomUp: make(map[string]map[string]struct{}, len(packages)),
 		TopDown:  make(map[string]map[string]struct{}, len(packages)),
 	}
+
 	for _, pkg := range packages {
-		res.BottomUp[pkg] = map[string]struct{}{}
-		res.TopDown[pkg] = map[string]struct{}{}
+		h.dp.BottomUp[pkg] = map[string]struct{}{}
+		h.dp.TopDown[pkg] = map[string]struct{}{}
 	}
 
 	for _, pkg := range packages {
-		updateDependency(&res, statusNew, goModuleName, pkg)
+		h.updateDependency(statusNew, pkg)
 	}
-
-	return res
 }
 
-func updateDependency(dp *dependency, status gitFileStatus, goModuleName, pkg string) {
+func (h *handler) updateDependency(status gitFileStatus, pkg string) {
 	switch status {
 	case statusNew:
-		for _, importedPackage := range getImportedPackages(pkg) {
-			if strings.HasPrefix(importedPackage, goModuleName) {
-				if dp.BottomUp == nil {
-					dp.BottomUp = map[string]map[string]struct{}{}
+		for _, importedPackage := range getImportedPackages(h.goModDir, pkg) {
+			if strings.HasPrefix(importedPackage, h.goModuleName) {
+				if h.dp.BottomUp == nil {
+					h.dp.BottomUp = map[string]map[string]struct{}{}
 				}
-				if dp.BottomUp[importedPackage] == nil {
-					dp.BottomUp[importedPackage] = map[string]struct{}{}
+				if h.dp.BottomUp[importedPackage] == nil {
+					h.dp.BottomUp[importedPackage] = map[string]struct{}{}
 				}
-				if dp.TopDown == nil {
-					dp.TopDown = map[string]map[string]struct{}{}
+				if h.dp.TopDown == nil {
+					h.dp.TopDown = map[string]map[string]struct{}{}
 				}
-				if dp.TopDown[pkg] == nil {
-					dp.TopDown[pkg] = map[string]struct{}{}
+				if h.dp.TopDown[pkg] == nil {
+					h.dp.TopDown[pkg] = map[string]struct{}{}
 				}
-				dp.BottomUp[importedPackage][pkg] = struct{}{}
-				dp.TopDown[pkg][importedPackage] = struct{}{}
+				h.dp.BottomUp[importedPackage][pkg] = struct{}{}
+				h.dp.TopDown[pkg][importedPackage] = struct{}{}
 			}
 		}
 	case statusModified, statusDeleted, statusRenamed:
-		dp.TopDown[pkg] = map[string]struct{}{}
-		for _, importedPackage := range getImportedPackages(pkg) {
-			if strings.HasPrefix(importedPackage, goModuleName) {
-				dp.TopDown[pkg][importedPackage] = struct{}{}
+		h.dp.TopDown[pkg] = map[string]struct{}{}
+		for _, importedPackage := range getImportedPackages(h.goModDir, pkg) {
+			if strings.HasPrefix(importedPackage, h.goModuleName) {
+				h.dp.TopDown[pkg][importedPackage] = struct{}{}
 			}
 		}
 	default:
@@ -162,32 +162,44 @@ func updateDependency(dp *dependency, status gitFileStatus, goModuleName, pkg st
 	}
 }
 
-var listPackages func() []string = func() []string {
+var listPackages func(goModDir string) []string = func(goModDir string) []string {
 	rcmd := "go list -buildvcs=false ./..."
-	return execCommand(rcmd)
+	return execCommand(rcmd, goModDir)
 }
 
-var getImportedPackages func(pkg string) []string = func(pkg string) []string {
+var getImportedPackages func(goModDir, pkg string) []string = func(goModDir, pkg string) []string {
 	rcmd := `go list -buildvcs=false -f '{{range $imp := .Imports}}{{printf "%s\n" $imp}}{{end}}' ` + pkg
-	return execCommand(rcmd)
+	return execCommand(rcmd, goModDir)
 }
 
-var getModifiedFiles func(baseBranchName string) []string = func(baseBranchName string) []string {
+var getModifiedFiles func(goModDir, baseBranchName string) []string = func(goModDir, baseBranchName string) []string {
 	rcmd := "git --no-pager diff --name-status --relative " + baseBranchName
-	return execCommand(rcmd)
+	return execCommand(rcmd, goModDir)
 }
 
-func getGoModuleName() string {
+func getGitRepositoryRoot() string {
+	rcmd := "git rev-parse --show-toplevel"
+	return execCommand(rcmd, ".")[0]
+}
+
+func (h *handler) loadGoModDir() {
+	rcmd := `find . -name "go.mod"`
+	grr := getGitRepositoryRoot()
+	goModPath := execCommand(rcmd, grr)[0]
+	h.goModDir = strings.TrimSuffix(goModPath, "go.mod")
+}
+
+func (h *handler) loadGoModuleName() {
 	rcmd := "head -1 go.mod"
 
 	// module github.com/asymptoter/gfg
-	firstLine := execCommand(rcmd)[0]
-	return strings.Split(firstLine, " ")[1]
+	firstLine := execCommand(rcmd, h.goModDir)[0]
+	h.goModuleName = strings.Split(firstLine, " ")[1]
 }
 
-func execCommand(rcmd string) []string {
+func execCommand(rcmd, goModDir string) []string {
 	cmd := exec.Command("sh", "-c", rcmd)
-	cmd.Dir = goModPath
+	cmd.Dir = goModDir
 	output, err := cmd.Output()
 	if err != nil {
 		return []string{}
@@ -197,17 +209,17 @@ func execCommand(rcmd string) []string {
 	return res[:len(res)-1] // Remove empty
 }
 
-func getToBeTestedPackages(dp *dependency, goModuleName, baseBranchName string) []string {
+func (h *handler) getToBeTestedPackages() []string {
 	res := []string{}
 	m := map[string]struct{}{}
-	for _, modifiedFile := range getModifiedFiles(baseBranchName) {
+	for _, modifiedFile := range getModifiedFiles(h.goModDir, h.baseBranchName) {
 		status, partialPackagePath := parseFileName(modifiedFile)
-		packagePath := goModuleName + "/" + partialPackagePath
+		packagePath := h.goModuleName + "/" + partialPackagePath
 
 		if _, ok := m[packagePath]; !ok {
 			m[packagePath] = struct{}{}
 
-			updateDependency(dp, status, goModuleName, packagePath)
+			h.updateDependency(status, packagePath)
 
 			if !strings.Contains(packagePath, "mocks") {
 				res = append(res, packagePath)
@@ -217,7 +229,7 @@ func getToBeTestedPackages(dp *dependency, goModuleName, baseBranchName string) 
 
 	// Add packages that depend on modified files
 	for _, d := range res {
-		for pkg := range dp.BottomUp[d] {
+		for pkg := range h.dp.BottomUp[d] {
 			if _, ok := m[pkg]; !ok {
 				m[pkg] = struct{}{}
 				if !strings.Contains(pkg, "mocks") {

@@ -7,7 +7,7 @@ import (
 )
 
 func TestConstructDependency(t *testing.T) {
-	listPackages = func() []string {
+	listPackages = func(string) []string {
 		return []string{
 			"a",
 			"b",
@@ -28,11 +28,11 @@ func TestConstructDependency(t *testing.T) {
 		"d": []string{},
 	}
 
-	getImportedPackages = func(pkg string) []string {
+	getImportedPackages = func(goModPath, pkg string) []string {
 		return importedPackageMap[pkg]
 	}
-
-	res := constructDependency("")
+	h := handler{}
+	h.constructDependency()
 	exp := dependency{
 		BottomUp: map[string]map[string]struct{}{
 			"a": map[string]struct{}{},
@@ -57,34 +57,37 @@ func TestConstructDependency(t *testing.T) {
 			"d": map[string]struct{}{},
 		},
 	}
-	if !reflect.DeepEqual(res, exp) {
-		log.Fatal("expected", exp, "actual", res)
+	if !reflect.DeepEqual(h.dp, exp) {
+		log.Fatal("\r\nexpected: ", exp, "\r\nactual: ", h.dp, "\r\n")
 	}
 }
 
 func TestGetToBeTestedPackages(t *testing.T) {
-	dep := dependency{
-		BottomUp: map[string]map[string]struct{}{
-			"gfg/a": map[string]struct{}{},
-			"gfg/b": map[string]struct{}{
-				"gfg/a": {},
+	h := handler{
+		goModuleName: "gfg",
+		dp: dependency{
+			BottomUp: map[string]map[string]struct{}{
+				"gfg/a": map[string]struct{}{},
+				"gfg/b": map[string]struct{}{
+					"gfg/a": {},
+				},
+				"gfg/c": map[string]struct{}{
+					"gfg/a": {},
+					"gfg/b": {},
+				},
+				"gfg/d": map[string]struct{}{},
 			},
-			"gfg/c": map[string]struct{}{
-				"gfg/a": {},
-				"gfg/b": {},
+			TopDown: map[string]map[string]struct{}{
+				"gfg/a": map[string]struct{}{
+					"gfg/b": {},
+					"gfg/c": {},
+				},
+				"gfg/b": map[string]struct{}{
+					"gfg/c": {},
+				},
+				"gfg/c": map[string]struct{}{},
+				"gfg/d": map[string]struct{}{},
 			},
-			"gfg/d": map[string]struct{}{},
-		},
-		TopDown: map[string]map[string]struct{}{
-			"gfg/a": map[string]struct{}{
-				"gfg/b": {},
-				"gfg/c": {},
-			},
-			"gfg/b": map[string]struct{}{
-				"gfg/c": {},
-			},
-			"gfg/c": map[string]struct{}{},
-			"gfg/d": map[string]struct{}{},
 		},
 	}
 
@@ -103,11 +106,11 @@ func TestGetToBeTestedPackages(t *testing.T) {
 		},
 	}
 
-	getImportedPackages = func(pkg string) []string {
+	getImportedPackages = func(goModPath, pkg string) []string {
 		return importedPackageMap[pkg]
 	}
 
-	getModifiedFiles = func(string) []string {
+	getModifiedFiles = func(goModPath, pkg string) []string {
 		return []string{
 			"M		a/1.go",
 			"A		e/2.go",
@@ -116,7 +119,7 @@ func TestGetToBeTestedPackages(t *testing.T) {
 		}
 	}
 
-	res := getToBeTestedPackages(&dep, "gfg", "")
+	res := h.getToBeTestedPackages()
 	exp := []string{
 		"gfg/a",
 		"gfg/e",
