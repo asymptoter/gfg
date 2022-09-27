@@ -96,8 +96,7 @@ func (h *handler) loadDependency() {
 		panic(err)
 	}
 
-	var res dependency
-	if err := json.Unmarshal(bs, &res); err != nil || len(res.BottomUp) == 0 {
+	if err := json.Unmarshal(bs, &h.dp); err != nil || len(h.dp.BottomUp) == 0 {
 		h.constructDependency()
 
 		// Store dependency map in file
