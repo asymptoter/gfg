@@ -10,14 +10,6 @@ import (
 	"time"
 )
 
-const (
-	keyBaseBranchName = "BASE_BRANCH_NAME"
-)
-
-var (
-	baseBranchName = os.Getenv(keyBaseBranchName)
-)
-
 /*
 package dependencys:
 
@@ -43,22 +35,15 @@ type dependency struct {
 }
 
 type handler struct {
-	dp             dependency
-	baseBranchName string
-	goModuleName   string
-	goModDir       string
+	dp           dependency
+	goModuleName string
+	goModDir     string
 }
 
 func main() {
 	t1 := time.Now()
 
-	h := handler{
-		baseBranchName: os.Getenv(keyBaseBranchName),
-	}
-
-	if len(h.baseBranchName) == 0 {
-		panic("ENV BASE_BRANCH_NAME not set")
-	}
+	h := handler{}
 
 	h.loadGoModDir()
 	h.loadGoModuleName()
@@ -171,8 +156,8 @@ var getImportedPackages func(goModDir, pkg string) []string = func(goModDir, pkg
 	return execCommand(rcmd, goModDir)
 }
 
-var getModifiedFiles func(goModDir, baseBranchName string) []string = func(goModDir, baseBranchName string) []string {
-	rcmd := "git --no-pager diff --name-status --relative " + baseBranchName
+var getModifiedFiles func(goModDir string) []string = func(goModDir string) []string {
+	rcmd := "git --no-pager diff --name-status --relative HEAD^"
 	return execCommand(rcmd, goModDir)
 }
 
@@ -211,7 +196,7 @@ func execCommand(rcmd, goModDir string) []string {
 func (h *handler) getToBeTestedPackages() []string {
 	res := []string{}
 	m := map[string]struct{}{}
-	for _, modifiedFile := range getModifiedFiles(h.goModDir, h.baseBranchName) {
+	for _, modifiedFile := range getModifiedFiles(h.goModDir) {
 		status, partialPackagePath := parseFileName(modifiedFile)
 		packagePath := h.goModuleName + "/" + partialPackagePath
 

@@ -110,7 +110,7 @@ func TestGetToBeTestedPackages(t *testing.T) {
 		return importedPackageMap[pkg]
 	}
 
-	getModifiedFiles = func(goModPath, pkg string) []string {
+	getModifiedFiles = func(goModPath string) []string {
 		return []string{
 			"M		a/1.go",
 			"A		e/2.go",
