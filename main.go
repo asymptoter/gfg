@@ -51,6 +51,8 @@ func main() {
 
 	toBeTestedPackages := h.getToBeTestedPackages()
 
+	h.saveDependency()
+
 	h.runGoTests(toBeTestedPackages)
 
 	fmt.Printf("time elapsed: %fs\n", time.Now().Sub(t1).Seconds())
@@ -83,15 +85,23 @@ func (h *handler) loadDependency() {
 
 	if err := json.Unmarshal(bs, &h.dp); err != nil || len(h.dp.BottomUp) == 0 {
 		h.constructDependency()
+	}
+}
 
-		// Store dependency map in file
-		mBytes, err := json.Marshal(h.dp)
-		if err != nil {
-			panic(err)
-		}
-		if _, err := file.Write(mBytes); err != nil {
-			panic(err)
-		}
+func (h *handler) saveDependency() {
+	file, err := os.OpenFile(h.goModDir+"/.go_module_dependency_map", os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { file.Close() }()
+
+	// Store dependency map in file
+	mBytes, err := json.Marshal(h.dp)
+	if err != nil {
+		panic(err)
+	}
+	if _, err := file.Write(mBytes); err != nil {
+		panic(err)
 	}
 }
 
