@@ -204,7 +204,7 @@ func execCommand(rcmd, goModDir string) []string {
 }
 
 func (h *handler) getToBeTestedPackages() []string {
-	res := []string{}
+	modifiedPackages := []string{}
 	m := map[string]struct{}{}
 	for _, modifiedFile := range getModifiedFiles(h.goModDir) {
 		status, partialPackagePath := parseFileName(modifiedFile)
@@ -216,13 +216,14 @@ func (h *handler) getToBeTestedPackages() []string {
 			h.updateDependency(status, packagePath)
 
 			if !strings.Contains(packagePath, "mocks") {
-				res = append(res, packagePath)
+				modifiedPackages = append(modifiedPackages, packagePath)
 			}
 		}
 	}
 
 	// Add packages that depend on modified files
-	for _, d := range res {
+	res := []string{}
+	for _, d := range modifiedPackages {
 		for pkg := range h.dp.BottomUp[d] {
 			if _, ok := m[pkg]; !ok {
 				m[pkg] = struct{}{}
@@ -233,7 +234,7 @@ func (h *handler) getToBeTestedPackages() []string {
 		}
 	}
 
-	return res
+	return append(res, modifiedPackages...)
 }
 
 type gitFileStatus string
