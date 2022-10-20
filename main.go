@@ -224,7 +224,9 @@ func (h *handler) getToBeTestedPackages() []string {
 	// Add packages that depend on modified files
 	res := []string{}
 	for _, d := range modifiedPackages {
+		fmt.Println(d)
 		for pkg := range h.dp.BottomUp[d] {
+			fmt.Println("    " + pkg)
 			if _, ok := m[pkg]; !ok {
 				m[pkg] = struct{}{}
 				if !strings.Contains(pkg, "mocks") {
