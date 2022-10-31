@@ -259,9 +259,11 @@ func parseFileName(path string) (gitFileStatus, string) {
 	status := gitFileStatus(ss[0][0])
 
 	for i := 1; i < len(ss); i++ {
-		if len(ss[i]) > 0 {
+		if len(ss[i]) > 0 && i == 1 && status != statusRenamed {
 			path = ss[i]
 			break
+		} else if len(ss[i]) > 0 && i == 2 && status == statusRenamed {
+			path = ss[i]
 		}
 	}
 
