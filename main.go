@@ -167,7 +167,7 @@ var getImportedPackages func(goModDir, pkg string) []string = func(goModDir, pkg
 }
 
 var getModifiedFiles func(goModDir string) []string = func(goModDir string) []string {
-	rcmd := `git --no-pager diff --name-status --relative`
+	rcmd := `git --no-pager diff --name-status --relative "HEAD^"`
 	return execCommand(rcmd, goModDir)
 }
 
