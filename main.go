@@ -206,7 +206,10 @@ func execCommand(rcmd, goModDir string) []string {
 func (h *handler) getToBeTestedPackages() []string {
 	modifiedPackages := []string{}
 	m := map[string]struct{}{}
-	for _, modifiedFile := range getModifiedFiles(h.goModDir) {
+	modifiedFiles := getModifiedFiles(h.goModDir)
+	fmt.Println("Modified files:")
+	for _, modifiedFile := range modifiedFiles {
+		fmt.Println("    " + modifiedFile)
 		status, partialPackagePath := parseFileName(modifiedFile)
 		packagePath := h.goModuleName + "/" + partialPackagePath
 
@@ -221,6 +224,7 @@ func (h *handler) getToBeTestedPackages() []string {
 		}
 	}
 
+	fmt.Println("\nModified packages:")
 	// Add packages that depend on modified files
 	res := []string{}
 	for _, d := range modifiedPackages {
@@ -235,6 +239,7 @@ func (h *handler) getToBeTestedPackages() []string {
 			}
 		}
 	}
+	fmt.Println("")
 
 	return append(res, modifiedPackages...)
 }
