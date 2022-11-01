@@ -167,7 +167,7 @@ var getImportedPackages func(goModDir, pkg string) []string = func(goModDir, pkg
 }
 
 var getModifiedFiles func(goModDir string) []string = func(goModDir string) []string {
-	rcmd := `git --no-pager diff --name-status --relative "HEAD^"`
+	rcmd := `git --no-pager diff --name-status --relative`
 	return execCommand(rcmd, goModDir)
 }
 
@@ -259,10 +259,10 @@ func parseFileName(path string) (gitFileStatus, string) {
 	status := gitFileStatus(ss[0][0])
 
 	for i := 1; i < len(ss); i++ {
-		if len(ss[i]) > 0 && i == 1 && status != statusRenamed {
+		if len(ss[i]) > 0 && status != statusRenamed {
 			path = ss[i]
 			break
-		} else if len(ss[i]) > 0 && i == 2 && status == statusRenamed {
+		} else if len(ss[i]) > 0 && status == statusRenamed {
 			path = ss[i]
 		}
 	}
