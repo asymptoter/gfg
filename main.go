@@ -192,12 +192,11 @@ func (h *handler) loadGoModuleName() {
 }
 
 func execCommand(rcmd, goModDir string) []string {
-	fmt.Println(rcmd)
 	cmd := exec.Command("sh", "-c", rcmd)
 	cmd.Dir = goModDir
 	output, err := cmd.Output()
 	if err != nil {
-		panic(err)
+		return []string{}
 	}
 
 	res := strings.Split(string(output), "\n")
