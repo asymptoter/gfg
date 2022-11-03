@@ -207,9 +207,7 @@ func (h *handler) getToBeTestedPackages() []string {
 	modifiedPackages := []string{}
 	m := map[string]struct{}{}
 	modifiedFiles := getModifiedFiles(h.goModDir)
-	fmt.Println("Modified files:")
 	for _, modifiedFile := range modifiedFiles {
-		fmt.Println("    " + modifiedFile)
 		status, partialPackagePath := parseFileName(modifiedFile)
 		packagePath := h.goModuleName + "/" + partialPackagePath
 
