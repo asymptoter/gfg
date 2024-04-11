@@ -1,6 +1,8 @@
+# Always use `go test ./..`
+
 # About this project
 
-This project can let you run go test on only necessary packages (modified packages and packages that depend on them) in a git repository. This could save you a lot of time instead of just running
+~~This project can let you run go test on only necessary packages (modified packages and packages that depend on them) in a git repository. This could save you a lot of time instead of just running
 ```bash
 go test ./...
 ```

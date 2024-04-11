@@ -3,7 +3,7 @@ package c
 import "testing"
 
 func TestC(t *testing.T) {
-	if C != "c" {
-		t.Fatal("not c")
+	if C != "cd" {
+		t.Error("C should be `cd`")
 	}
 }
