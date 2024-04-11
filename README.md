@@ -1,4 +1,5 @@
-# Always use `go test ./..`
+# NOTE
+Don't use this project's code, always use `go test ./...` for testing. `go test ./...` can only run necessary tests.
 
 # About this project
 
